@@ -1,1 +1,199 @@
-<h1>Welcome to forge2djs</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="icon" href="bird.png">
+  <title>Flappy Bird - Forge2djs</title>
+  <style>
+    body {
+      margin: 0;
+      user-select: none;
+      padding: 0;
+      background-color: black;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    #startScreen, #gameOverScreen {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      font-size: 24px;
+      text-align: center;
+    }
+    #gameOverScreen {
+      display: none;
+    }
+    button {
+      cursor: pointer;
+      padding: 15px 30px;
+      border: none;
+      font-size: 18px;
+      background-color: #ffcc00;
+      color: black;
+      font-weight: bold;
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="startScreen">
+    <p>Tap to Start</p>
+  </div>
+  <div id="gameOverScreen">
+    <p>Game Over</p>
+    <p id="finalScore"></p>
+    <button id="restartGame">Restart</button>
+  </div>
+
+  <script src="https://forge2djs.vercel.app/forge.js"></script>
+  <script>
+    let game, bird, pipes, scoreText, background, ground;
+    let score = 0;
+    let gameRunning = false;
+    let jumpSound = new Audio("jump.mp3");
+    let hitSound = new Audio("hit.mp3");
+
+    function startGame() {
+      document.getElementById("startScreen").style.display = "none";
+      gameRunning = true;
+
+      game = Forge.int({
+        color: '#70c5ce',
+        screen: [window.innerWidth, window.innerHeight],
+        renderTo: 'body',
+      });
+
+      // Background and ground
+      background = game.cube({ width: game.screen.width * 2, height: game.screen.height, color: '#70c5ce', texture: 'u_1_2.jpg' });
+      ground = game.cube({ width: game.screen.width * 2, height: 500, color: '#654321', texture: 'ground.png' });
+      ground.setPosition(0, game.screen.height - ground.size.height);
+      // Bird setup
+      bird = game.cube({ width: 50, height: 40, color: 'yellow', physics: true, texture: 'bird.png' });
+      bird.setPosition(100, game.screen.height / 2);
+      pipes = [];
+      score = 0;
+
+      // Score text
+      scoreText = game.addText({ text: "Score: 0", x: 20, y: 40, font: "30px Arial", color: "white" });
+      function jump() {
+        if (!gameRunning) return;
+        bird.setVelocity(0, -15);
+        bird.rotation = -0.3;
+        jumpSound.currentTime = 0;
+        jumpSound.play();
+      }
+
+      window.addEventListener('keydown', (e) => { if (e.key === ' ') jump(); });
+      window.addEventListener('touchstart', () => jump());
+
+      function spawnPipe() {
+        const gap = 160;
+        const pipeWidth = 90;
+        const centerY = game.screen.height / 2;
+        const variation = Math.random() * 100 - 50; // Shift up/down by ±50px
+        const topHeight = centerY - gap / 2 + variation;
+        const bottomHeight = game.screen.height - (topHeight + gap) - 50;
+        const bottomPipe = game.cube({ width: pipeWidth, height: bottomHeight, color: 'green', texture: 'pipe.png' });
+        bottomPipe.setPosition(game.screen.width, game.screen.height - bottomHeight);
+        const topPipe = game.cube({ width: pipeWidth, height: topHeight, color: 'green', texture: 'pipe.png' });
+        topPipe.setPosition(game.screen.width, 0);
+        topPipe.flipY = true;
+        pipes.push({ topPipe, bottomPipe, passed: false });
+      }
+      function movePipes() {
+        pipes.forEach(({ topPipe, bottomPipe }, index) => {
+          topPipe.setPosition(topPipe.position.x - 5, topPipe.position.y);
+          bottomPipe.setPosition(bottomPipe.position.x - 5, bottomPipe.position.y);
+
+          if (topPipe.position.x + topPipe.size.width < bird.position.x && !pipes[index].passed) {
+            pipes[index].passed = true;
+            score++;
+            scoreText.text = "Score: " + score;
+          }
+        });
+
+        pipes = pipes.filter(({ topPipe }) => topPipe.position.x + topPipe.size.width > 0);
+      }
+      function moveBackground() {
+        background.setPosition(background.position.x - 1, background.position.y);
+        ground.setPosition(ground.position.x - 3, ground.position.y);
+
+        if (background.position.x <= -game.screen.width) {
+          background.setPosition(0, background.position.y);
+        }
+        if (ground.position.x <= -game.screen.width) {
+          ground.setPosition(0, ground.position.y);
+        }
+      }
+
+      function gameOver() {
+        gameRunning = false;
+        hitSound.play();
+        document.getElementById("gameOverScreen").style.display = "flex";
+        document.getElementById("finalScore").textContent = "Final Score: " + score;
+      }
+
+      function animate() {
+        if (!gameRunning) return;
+        movePipes();
+        moveBackground();
+
+        pipes.forEach(({ topPipe, bottomPipe }) => {
+          if (bird.isCollidingWith(topPipe) || bird.isCollidingWith(bottomPipe)) {
+            gameOver();
+          }
+        });
+
+        if (bird.position.y >= game.screen.height - 150 || bird.position.y <= 0) {
+          gameOver();
+        }
+
+        bird.rotation += 0.02;
+        if (bird.rotation > 0.3) bird.rotation = 0.3;
+
+        game.loop(true);
+        requestAnimationFrame(animate);
+      }
+
+      setInterval(spawnPipe, 1200);
+      animate();
+      document.getElementById('restartGame').addEventListener('click', restartGame)
+      function restartGame() {
+  document.getElementById("gameOverScreen").style.display = "none";
+  gameRunning = true;
+
+  // Reset bird position and velocity
+  bird.setPosition(100, game.screen.height / 2);
+  bird.setVelocity(0, 0);
+  bird.rotation = 0;
+
+  // Clear pipes
+  pipes.forEach(({ topPipe, bottomPipe }) => {
+    game.removeEntry(topPipe);
+    game.removeEntry(bottomPipe);
+  });
+  pipes = [];
+
+  // Reset score
+  score = 0;
+  scoreText.text = "Score: 0";
+  
+  // Restart the animation loop
+  animate();
+}
+    }
+    document.getElementById("startScreen").addEventListener("click", startGame);
+  </script>
+
+</body>
+</html>
