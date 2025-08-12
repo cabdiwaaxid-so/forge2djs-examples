@@ -87,7 +87,7 @@
       scoreText = game.addText({ text: "Score: 0", x: 20, y: 40, font: "30px Arial", color: "white" });
       function jump() {
         if (!gameRunning) return;
-        bird.setVelocity(0, -15);
+        bird.setVelocity(0, -20);
         bird.rotation = -0.3;
         jumpSound.currentTime = 0;
         jumpSound.play();
